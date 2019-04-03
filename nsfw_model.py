@@ -14,6 +14,9 @@ import checkFiletype as cft
 import cv2
 import classify_nsfw as clf
 
+def print_err(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
 """
 Check file extension: if the saved extensions does not agree with MIME flag as suspicious.
 
@@ -70,7 +73,7 @@ class NSFWDetect(object):
         Raises:
             IOError if the filepath points to a file that does not exist, or if something goes wrong during file opening
         """
-        print('Classify video')
+        print_err('Classifying video file')
         if not os.path.exists(filepath) or not os.path.isfile(filepath):
             raise IOError("File does not exist / argument is not a file.")
         vidcap = cv2.VideoCapture(filepath)
@@ -78,17 +81,20 @@ class NSFWDetect(object):
         n = framecount ** 0.5
         frames = []
         frame_scores = []
-        print('Frame count is ', framecount)
+        print_err('Frame count is {}'.format(framecount))
         for i in range(int(n) + 1):
             vidcap.set(cv2.CAP_PROP_POS_FRAMES, random.randrange(framecount))
             success, image = vidcap.read()
             if success:
                 frames.append(Image.fromarray(image))
-        print('Loaded frames')
+        print_err('Loaded {} frames'.format(len(frames)))
+        if len(frames) == 0:
+            print_err('Cannot read video frames; returning score of -1.0')
+            return -1.0
         for frame in frames:
-            frame_scores.append(self.caffe_preprocess_and_compute(frame)[1])
+            frame_scores.append(self.caffe_preprocess_and_compute(frame))
         frame_scores = np.array(frame_scores)
-        print(frame_scores)
+        print_err(frame_scores)
         if np.sum(frame_scores >= self.LOW_THRESH) > self.FRAME_COUNT_THRESH or np.sum(frame_scores >= self.LOW_THRESH) == 0:
             return np.max(frame_scores)
         thresh = np.max(frame_scores)
@@ -99,7 +105,7 @@ class NSFWDetect(object):
             success, image = vidcap.read()
             if success:
                 im = Image.fromarray(image)
-            sc = self.caffe_preprocess_and_compute(im)[1]
+            sc = self.caffe_preprocess_and_compute(im)
             if sc >= thresh:
                 return sc
             i += 1
@@ -134,8 +140,8 @@ class NSFWDetect(object):
 
             H, W, _ = image.shape
             _, _, h, w = self.nsfw_net.blobs['data'].data.shape
-            h_off = max((H - h) / 2, 0)
-            w_off = max((W - w) / 2, 0)
+            h_off = max((H - h) // 2, 0)
+            w_off = max((W - w) // 2, 0)
             crop = image[h_off:h_off + h, w_off:w_off + w, :]
             transformed_image = self.caffe_transformer.preprocess('data', crop)
             transformed_image.shape = (1,) + transformed_image.shape
@@ -147,16 +153,16 @@ class NSFWDetect(object):
             outputs = all_outputs[self.output_layers[0]][0].astype(float)
             return outputs[1]
         else:
-            return []
+            return -1
     
     def run(self, filepath):
         """
             Return score or SUSPICOUS flag based on file at filepath.
         """
         filetype_check, file_extension, mime_extension, filetype = cft.checkFiletype(filepath)
-        if file_extension != mime_extension:
-            print('Suspicious file: extensions don\'t match up. File extension: {}, MIME extension: {}'.format(file_extension, mime_extension))
-            return -1
+        if not filetype_check:
+            return ('Suspicious file: extensions don\'t match up. File extension: {}, MIME extension: {}, file_type: {}\t\t\t -1'.format(file_extension, mime_extension, filetype))
+            #return -1
         if filetype == 'image':
             score = self.classify_image(filepath)
             print('NSFW score: {}'.format(score))

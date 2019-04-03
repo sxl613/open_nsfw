@@ -14,6 +14,17 @@ import checkFiletype as cft
 import cv2
 import classify_nsfw as clf
 
+"""
+Check file extension: if the saved extensions does not agree with MIME flag as suspicious.
+
+For image:  return a probability score
+
+For video:  do a custom check on frames and return a probability score
+
+For other extensions: ignore
+"""
+
+
 class NSFWDetect(object):
     LOW_THRESH = 0.6
     MEDIUM_THRESH = 0.7
@@ -45,7 +56,7 @@ class NSFWDetect(object):
             IOError if the filepath points to a file that does not exist, or if something goes wrong during file opening
         """
         print('Classify image')
-        return self.caffe_preprocess_and_compute(Image.fromarray(open(filepath).read()))
+        return self.caffe_preprocess_and_compute(Image.open(filepath))
     
     def classify_video(self, filepath):
         """
@@ -176,35 +187,6 @@ class NSFWDetect(object):
 
 
 
-"""
-Check file extension: if the saved extensions does not agree with MIME flag as suspicious.
-
-For image:  return a probability score
-
-For video:  do a custom check on frames and return a probability score
-
-For other extensions: ignore
-"""
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input_file", help="Path to the input file")
-    # Optional arguments.
-    parser.add_argument("--model_def", help="Model definition file.")
-    parser.add_argument("--pretrained_model", help="Trained model weights file.")
-    args = parser.parse_args()
-    args.input_file = os.path.normpath(args.input_file)
-    if not os.path.exists(args.input_file) or not os.path.isfile(args.input_file):
-        raise IOError("File does not exist / checkFiletype's argument is not a file.")
-
-    print('Running NSFWDetect on ', args.input_file)
-
-    nsfw_detect = NSFWDetect(args.model_def, args.pretrained_model)
-    #nsfw_detect.classify_video(args.input_file)
-    nsfw_detect.run(args.input_file)
-
-
-if __name__ == "__main__":
-    main()
 

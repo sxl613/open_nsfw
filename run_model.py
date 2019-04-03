@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import argparse 
 import os
 from nsfw_model import NSFWDetect
